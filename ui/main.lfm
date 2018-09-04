@@ -1,0 +1,12 @@
+object MainForm: TMainForm
+  Left = 826
+  Height = 360
+  Top = 400
+  Width = 480
+  Caption = 'TickCollector'
+  DesignTimePPI = 144
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  Position = poDesktopCenter
+  LCLVersion = '1.8.2.0'
+end
