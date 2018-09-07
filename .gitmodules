@@ -1,0 +1,6 @@
+[submodule "src/coinbase-pro"]
+	path = src/coinbase-pro
+	url = https://github.com/mr-highball/coinbase-pro.git
+[submodule "src/ezthreads"]
+	path = src/ezthreads
+	url = https://github.com/mr-highball/ezthreads.git
