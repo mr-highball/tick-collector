@@ -60,6 +60,8 @@ type
     FAuth: IGDAXAuthenticator;
     FProducts: IGDAXProducts;
     FCollected: TStringList;
+    FThread: IEZThread;
+    FCanStop: Boolean;
     function GetAuth: IGDAXAuthenticator;
     function GetAvailableProducts: TStringArray;
     function GetCollectedProducts: TStringArray;
@@ -67,6 +69,7 @@ type
     function GetState: TTickState;
     procedure SetAuth(Const AValue: IGDAXAuthenticator);
     procedure SetPollInterval(Const AValue: Cardinal);
+    procedure CollectMethod(Const AThread:IEZThread);
   strict protected
   public
     property Authenticator : IGDAXAuthenticator read GetAuth write SetAuth;
@@ -121,8 +124,17 @@ begin
 end;
 
 function TTickCollectorImpl.GetCollectedProducts: TStringArray;
+var
+  I:Integer;
 begin
-  //todo
+  Critical.Enter;
+  try
+    SetLength(Result,FCollected.Count);
+    for I:=0 to Pred(FCollected.Count) do
+      Result[I]:=FCollected[I];
+  finally
+    Critical.Leave;
+  end;
 end;
 
 function TTickCollectorImpl.GetPollInterval: Cardinal;
@@ -146,6 +158,27 @@ begin
   if State<>tsStopped then
     raise Exception.Create('stop tick collector first');
   FPollInterval:=AValue;
+end;
+
+procedure TTickCollectorImpl.CollectMethod(const AThread: IEZThread);
+var
+  LStart:TDateTime;
+  LProducts:TStringArray;
+  I:Integer;
+begin
+  //one time fetch the products we are collecting
+  LProducts:=CollectedProducts;
+  while FState=tsStarted do
+  begin
+    //get start time so we know how long to sleep
+    LStart:=Now;
+
+    //iterate the product ids and fetch ticker information for each one
+    for I:=0 to High(LProducts) do
+    begin
+      //todo - create a gdax product, assign id, get data store in map
+    end;
+  end;
 end;
 
 function TTickCollectorImpl.UpdatePollInterval(const AInterval: Cardinal): ITickCollector;
@@ -217,13 +250,16 @@ end;
 
 procedure TTickCollectorImpl.Start;
 begin
-  if FState<>tsStopped then
+  if FState<>tsStopped or ((FState=tsStopped) and not FCanStop) then
     Exit;
   if not Assigned(FAuth) then
     raise Exception.Create('please assign a valid authenticator');
   if FAuth.Key.IsEmpty or FAuth.Passphrase.IsEmpty or FAuth.Secret.IsEmpty then
     raise Exception.Create('secret/passphrase/key are required in the authenticator');
   //todo - start the collector
+  FThread.Stop;
+  FThread.Setup(CollectMethod).Start;
+  FCanStop:=False;
 end;
 
 procedure TTickCollectorImpl.Stop;
@@ -237,14 +273,19 @@ begin
   FProducts:=TGDAXProductsImpl.Create;
   FCollected:=TStringList.Create;
   FMap:=TDataMap.Create(True);
+  FThread:=TEZThreadImpl.Create;
+  FCanStop:=True;
 end;
 
 destructor TTickCollectorImpl.Destroy;
 begin
+  if State=tsStarted then
+    Stop;
   FAuth:=nil;
   FProducts:=nil;
   FCollected.Free;
   FMap.Free;
+  FThread:=nil;
   inherited Destroy;
 end;
 
