@@ -61,7 +61,8 @@ type
     FProducts: IGDAXProducts;
     FCollected: TStringList;
     FThread: IEZThread;
-    FCanStop: Boolean;
+    FCanStart,
+    FRequestedStop: Boolean;
     function GetAuth: IGDAXAuthenticator;
     function GetAvailableProducts: TStringArray;
     function GetCollectedProducts: TStringArray;
@@ -70,6 +71,8 @@ type
     procedure SetAuth(Const AValue: IGDAXAuthenticator);
     procedure SetPollInterval(Const AValue: Cardinal);
     procedure CollectMethod(Const AThread:IEZThread);
+    procedure StopCollect(Const AThread:IEZThread);
+    procedure Failure(Const AThread:IEZThread);
   strict protected
   public
     property Authenticator : IGDAXAuthenticator read GetAuth write SetAuth;
@@ -91,7 +94,8 @@ type
 
 implementation
 uses
-  syncobjs, gdax.api.authenticator, gdax.api.products;
+  syncobjs, gdax.api.authenticator, gdax.api.products, gdax.api.ticker,
+  dateutils;
 var
   Critical : TCriticalSection;
 
@@ -163,12 +167,25 @@ end;
 procedure TTickCollectorImpl.CollectMethod(const AThread: IEZThread);
 var
   LStart:TDateTime;
+  LTicker:IGDAXTicker;
+  LProduct:IGDAXProduct;
   LProducts:TStringArray;
   I:Integer;
+  LList:TStringList;
+  LContent,
+  LError: String;
+  LDiff: Cardinal;
 begin
+  //setup the product/ticker
+  LProduct:=TGDAXProductImpl.Create;
+  LProduct.Authenticator:=FAuth;
+  LTicker:=TGDAXTickerImpl.Create;
+  LTicker.Product:=LProduct;
+  LTicker.Authenticator:=FAuth;
+
   //one time fetch the products we are collecting
   LProducts:=CollectedProducts;
-  while FState=tsStarted do
+  while not FRequestedStop do
   begin
     //get start time so we know how long to sleep
     LStart:=Now;
@@ -176,9 +193,52 @@ begin
     //iterate the product ids and fetch ticker information for each one
     for I:=0 to High(LProducts) do
     begin
-      //todo - create a gdax product, assign id, get data store in map
+      try
+        //assign current id to product
+        LProduct.ID:=LProducts[I];
+
+        //attempt to get ticker info
+        if LTicker.Get(LContent,LError) then
+        begin
+          //if success, store the content in the map
+          LList:=FMap.Data[FMap.IndexOf(LProducts[I])];
+
+          //aquire lock before recording content
+          Critical.Enter;
+          try
+            LList.Add(LContent);
+          finally
+            Critical.Leave;
+          end;
+        end;
+      except on E:Exception do
+        //todo - handle exception/log
+      end;
+    end;
+
+    if PollInterval > 0 then
+    begin
+      //find the difference between start of polling and now
+      LDiff:=MilliSecondsBetween(Now,LStart);
+      if LDiff >= FPollInterval then
+        Continue;
+
+      //sleep remainder
+      Sleep(FPollInterval - LDiff);
     end;
   end;
+end;
+
+procedure TTickCollectorImpl.StopCollect(const AThread: IEZThread);
+begin
+  FState:=tsStopped;
+end;
+
+procedure TTickCollectorImpl.Failure(const AThread: IEZThread);
+begin
+  FCanStart:=True;
+  FRequestedStop:=False;
+  FState:=tsStopped;
 end;
 
 function TTickCollectorImpl.UpdatePollInterval(const AInterval: Cardinal): ITickCollector;
@@ -250,21 +310,31 @@ end;
 
 procedure TTickCollectorImpl.Start;
 begin
-  if FState<>tsStopped or ((FState=tsStopped) and not FCanStop) then
+  if (FState<>tsStopped) or ((FState=tsStopped) and not FCanStart) then
     Exit;
   if not Assigned(FAuth) then
     raise Exception.Create('please assign a valid authenticator');
   if FAuth.Key.IsEmpty or FAuth.Passphrase.IsEmpty or FAuth.Secret.IsEmpty then
     raise Exception.Create('secret/passphrase/key are required in the authenticator');
-  //todo - start the collector
-  FThread.Stop;
-  FThread.Setup(CollectMethod).Start;
-  FCanStop:=False;
+
+  FThread
+    .Setup(CollectMethod,Failure,nil)
+    .Events
+      .UpdateOnStop(StopCollect)
+      .Thread
+    .Start;
+  FCanStart:=False;
 end;
 
 procedure TTickCollectorImpl.Stop;
 begin
-  //todo - stop the collector
+  FRequestedStop:=True;
+
+  //block until thread is stopped
+  while FState=tsStarted do
+    Continue;
+
+  FCanStart:=True;
 end;
 
 constructor TTickCollectorImpl.Create;
@@ -274,7 +344,8 @@ begin
   FCollected:=TStringList.Create;
   FMap:=TDataMap.Create(True);
   FThread:=TEZThreadImpl.Create;
-  FCanStop:=True;
+  FCanStart:=True;
+  FRequestedStop:=False;
 end;
 
 destructor TTickCollectorImpl.Destroy;
