@@ -1,12 +1,113 @@
 object MainForm: TMainForm
-  Left = 826
+  Left = 758
   Height = 360
-  Top = 400
+  Top = 360
   Width = 480
   Caption = 'TickCollector'
-  DesignTimePPI = 144
+  ClientHeight = 360
+  ClientWidth = 480
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   Position = poDesktopCenter
-  LCLVersion = '1.8.2.0'
+  LCLVersion = '1.8.4.0'
+  object pctrl_main: TPageControl
+    Left = 0
+    Height = 360
+    Top = 0
+    Width = 480
+    ActivePage = ts_products
+    Align = alClient
+    TabIndex = 0
+    TabOrder = 0
+    object ts_products: TTabSheet
+      Caption = 'Products'
+      ClientHeight = 332
+      ClientWidth = 472
+      object scroll_products: TScrollBox
+        AnchorSideLeft.Control = ts_products
+        AnchorSideTop.Control = ts_products
+        AnchorSideRight.Control = ts_products
+        AnchorSideRight.Side = asrBottom
+        AnchorSideBottom.Control = btn_multi
+        Left = 5
+        Height = 297
+        Top = 5
+        Width = 462
+        HorzScrollBar.Page = 393
+        VertScrollBar.Page = 146
+        Anchors = [akTop, akLeft, akRight, akBottom]
+        BorderSpacing.Left = 5
+        BorderSpacing.Top = 5
+        BorderSpacing.Right = 5
+        BorderSpacing.Bottom = 5
+        BorderStyle = bsNone
+        ClientHeight = 297
+        ClientWidth = 462
+        TabOrder = 0
+        object lbl_list_products: TLabel
+          Left = 0
+          Height = 15
+          Top = 0
+          Width = 462
+          Align = alTop
+          Alignment = taCenter
+          BorderSpacing.Bottom = 5
+          Caption = 'Check all of the products below that you want to collect ticker data for'
+          Font.Style = [fsBold]
+          ParentColor = False
+          ParentFont = False
+        end
+        object chk_list_products: TCheckListBox
+          Left = 0
+          Height = 120
+          Top = 20
+          Width = 462
+          Align = alTop
+          BorderStyle = bsNone
+          Columns = 2
+          Items.Strings = (
+            ''
+          )
+          ItemHeight = 17
+          Sorted = True
+          TabOrder = 0
+          Data = {
+            0100000000
+          }
+        end
+        object line_list_products: TShape
+          AnchorSideLeft.Control = chk_list_products
+          AnchorSideTop.Control = chk_list_products
+          AnchorSideTop.Side = asrBottom
+          AnchorSideRight.Control = chk_list_products
+          AnchorSideRight.Side = asrBottom
+          Left = 0
+          Height = 1
+          Top = 145
+          Width = 462
+          Anchors = [akTop, akLeft, akRight]
+          BorderSpacing.Top = 5
+          Brush.Color = clBlack
+        end
+      end
+      object btn_multi: TButton
+        AnchorSideTop.Side = asrBottom
+        AnchorSideRight.Control = scroll_products
+        AnchorSideRight.Side = asrBottom
+        AnchorSideBottom.Control = ts_products
+        AnchorSideBottom.Side = asrBottom
+        Left = 392
+        Height = 25
+        Top = 307
+        Width = 75
+        Anchors = [akRight, akBottom]
+        Caption = 'Start'
+        OnClick = btn_multiClick
+        TabOrder = 1
+      end
+    end
+    object ts_auth: TTabSheet
+      Caption = 'Authenticator'
+    end
+  end
 end
